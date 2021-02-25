@@ -5,10 +5,13 @@ LENGTH = 3
 
 class Node():
     """Node"""
-    def __init__(self, state, parent, action):
+    def __init__(self, state, parent, action, depth = None):
         self.state = state
         self.parent = parent
         self.action = action
+        self.depth = depth
+    def __str__(self):
+        return f'Nodo depth: {self.depth}'
 
 class StackFrontier():
     def __init__(self):
@@ -47,11 +50,56 @@ class QueueFrontier(StackFrontier):
             node = self.frontier[0]
             self.frontier = self.frontier[1:]
             return node
-        
-        
+
+class HeapFrontier(StackFrontier):
+    """Heap frontier"""
+    def __init__(self, costFunction):
+        self.frontier = []
+        self.costFunction = costFunction
+    def add(self, node):
+        cost = self.costFunction(node.state)
+        self.frontier.append({'node':node, 'cost':cost})
+        self.frontier.sort(key = self.get_cost)
+    def get_cost(self, f):
+        return f.get('cost')
+    def contains_state(self, state):
+        for element in self.frontier:
+            if (state == element['node'].state).all():
+                return True
+        return False
+    def remove(self):
+        if self.empty():
+            raise Exception("empty frontier")
+        else:
+            # get the last node and split the array
+            node = self.frontier[0]['node']
+            self.frontier = self.frontier[1:]
+            return node
+
+
+def cost(board):
+    """
+    recive un arreglo bidimensional 3x3 con los valores del 0 al 9 donde
+    ninguno se repite.
+    retorna la estimación del costo usando la distancia de manhattan.
+    """
+    indices = [
+        (0,0), (1,0), (2,0),
+        (0,1), (1,1), (2,1),
+        (0,2), (1,2), (2,2)
+    ]
+
+    totalCost = 0
+    for row, values in enumerate(board):
+        for col, value in enumerate(values):
+            #manhattan distance:
+            x, y = indices[value]
+            totalCost += np.abs(y - row) + np.abs(x - col)
+    
+    return totalCost
 
 class Puzzle8():
-    def __init__(self, method, puzzle):
+    def __init__(self, puzzle):
         values = puzzle.split(',')
         # only if the array is equal to nine continue
         if len(values) != 9:
@@ -71,7 +119,6 @@ class Puzzle8():
         ])
 
         self.solution = None
-        self.method = method
 
     def neighbors(self, state):
         # first search the agent.
@@ -101,12 +148,9 @@ class Puzzle8():
         self.num_explored = 0
 
         #Start with the frontier that contains the initial state
-        start = Node(state=self.startState, parent=None, action=None)
+        start = Node(state=self.startState, parent=None, action=None, depth=0)
         #select the method
-        if self.method == 'dfs':
-            frontier = StackFrontier()
-        else:
-            frontier = QueueFrontier()
+        frontier = HeapFrontier(cost)
         frontier.add(start)
 
         #Start with an empty explored set
@@ -138,7 +182,7 @@ class Puzzle8():
             for action, state in self.neighbors(node.state):
                 fixState = tuple(list(state.reshape(-1)))
                 if not frontier.contains_state(state) and fixState not in self.explored:
-                    child = Node(state = state, parent = node, action = action)
+                    child = Node(state = state, parent = node, action = action, depth=node.depth+1)
                     frontier.add(child)
 
     def print(self):
@@ -147,7 +191,7 @@ class Puzzle8():
         print(f'node explored: {self.num_explored}')
         print(f'path cost: {len(self.solution)}')
 
-puzzle = Puzzle8(sys.argv[1], sys.argv[2])
+puzzle = Puzzle8(sys.argv[1])
 print("Solving...")
 puzzle.solve()
 puzzle.print()
